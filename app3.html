@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ultimate Online Instrument Player with Tone.js</title>
+<script src="https://cdn.jsdelivr.net/npm/tone@14.7.77/build/Tone.js"></script>
+<style>
+body { font-family: Arial, sans-serif; text-align: center; background: #121212; color: #fff; margin:0; padding:0;}
+h1 { margin: 20px; }
+#keyboard { display: flex; flex-wrap: wrap; justify-content: center; margin: 20px; }
+.key { width: 40px; height: 140px; margin: 2px; background: #eee; color:#000; line-height: 140px; text-align: center; border-radius:5px; user-select:none; transition:0.1s;}
+.key.pressed { background: #ffd700; transform: scale(0.95);}
+select, button { font-size:16px; padding:5px 10px; margin:5px;}
+#instructions { margin-top: 10px; max-width:900px; margin-left:auto; margin-right:auto; background:#222; padding:15px; border-radius:10px;}
+</style>
+</head>
+<body>
+
+<h1>Ultimate Online Instrument Player</h1>
+
+<select id="instrumentSelect">
+  <option value="piano">Piano</option>
+  <option value="drums">Drums</option>
+  <option value="guitar">Guitar</option>
+  <option value="violin">Violin</option>
+  <option value="saxophone">Saxophone</option>
+  <option value="flute">Flute</option>
+  <option value="beatpad">Drum Machine / Beat Pad</option>
+</select>
+
+<div id="keyboard"></div>
+
+<div id="instructions"></div>
+
+<div id="recordControls">
+  <button id="startRecord">Start Recording</button>
+  <button id="stopRecord">Stop & Play</button>
+</div>
+
+<script>
+// Keyboard keys
+const keys = ['1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','M'];
+
+// Map keys to notes (one octave progression for simplicity)
+const noteMap = ['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5','B5','C6','D6','E6','F6','G6','A6','B6','C7','D7','E7','F7','G7','A7','B7','C8','D8'];
+
+// Instruments: Tone.js synths
+const instruments = {
+  piano: new Tone.Sampler({
+    urls: {"C4":"C4.mp3"},
+    baseUrl:"https://tonejs.github.io/audio/salamander/",
+  }).toDestination(),
+  guitar: new Tone.Synth({ oscillator: { type: 'triangle' }}).toDestination(),
+  violin: new Tone.Synth({ oscillator: { type: 'sawtooth' }}).toDestination(),
+  saxophone: new Tone.Synth({ oscillator: { type: 'square' }}).toDestination(),
+  flute: new Tone.Synth({ oscillator: { type: 'sine' }}).toDestination(),
+  drums: {
+    // Basic drum synths
+    Kick: new Tone.MembraneSynth().toDestination(),
+    Snare: new Tone.NoiseSynth({noise:{type:'white'},envelope:{attack:0.001, decay:0.2, sustain:0}}).toDestination(),
+    HiHat: new Tone.MetalSynth({frequency:400, envelope:{attack:0.001, decay:0.1, release:0.01},harmonicity:5.1, modulationIndex:32, resonance:4000, octaves:1.5}).toDestination()
+  },
+  beatpad: new Tone.MembraneSynth().toDestination()
+};
+
+// Instructions
+const instructionsText = {
+  piano: 'Press keys 1 → M to play piano notes.',
+  drums: 'Press keys 1 → M to play different drum sounds.',
+  guitar: 'Press keys 1 → M to play guitar notes.',
+  violin: 'Press keys 1 → M to play violin notes.',
+  saxophone: 'Press keys 1 → M to play saxophone notes.',
+  flute: 'Press keys 1 → M to play flute notes.',
+  beatpad: 'Press keys 1 → M to play drum machine / synth sounds.'
+};
+
+// Keyboard display
+const keyboardDiv = document.getElementById('keyboard');
+keys.forEach(k=>{
+  const keyDiv = document.createElement('div');
+  keyDiv.classList.add('key');
+  keyDiv.id='key_'+k;
+  keyDiv.innerText=k;
+  keyboardDiv.appendChild(keyDiv);
+});
+
+// Show instructions
+function showInstructions(inst){
+  document.getElementById('instructions').innerHTML=`<h3>${inst.charAt(0).toUpperCase()+inst.slice(1)} Instructions</h3><p>${instructionsText[inst]}</p>`;
+}
+showInstructions('piano');
+
+// Recording
+let isRecording=false;
+let recordNotes=[];
+let recordStart=0;
+
+document.getElementById('startRecord').addEventListener('click',()=>{
+  isRecording=true;
+  recordNotes=[];
+  recordStart=Date.now();
+  alert("Recording started!");
+});
+
+document.getElementById('stopRecord').addEventListener('click',()=>{
+  isRecording=false;
+  alert("Playing recorded sequence!");
+  recordNotes.forEach(n=>{
+    setTimeout(()=>{
+      playInstrument(n.instrument,n.key);
+    },n.time);
+  });
+});
+
+// Play sound
+function playInstrument(inst,key){
+  const idx=keys.indexOf(key);
+  if(idx===-1) return;
+  if(inst==='drums'){
+    if(idx%3===0) instruments.drums.Kick.triggerAttackRelease("C2","8n");
+    else if(idx%3===1) instruments.drums.Snare.triggerAttackRelease("8n");
+    else instruments.drums.HiHat.triggerAttackRelease("16n");
+  }else{
+    const note=noteMap[idx]||'C4';
+    if(inst==='beatpad') instruments.beatpad.triggerAttackRelease(note,'8n');
+    else instruments[inst].triggerAttackRelease(note,'8n');
+  }
+}
+
+// Key handling
+document.addEventListener('keydown',e=>{
+  const key=e.key.toUpperCase();
+  if(!keys.includes(key)) return;
+  const inst=document.getElementById('instrumentSelect').value;
+  playInstrument(inst,key);
+  document.getElementById('key_'+key).classList.add('pressed');
+  if(isRecording) recordNotes.push({instrument:inst,key:key,time:Date.now()-recordStart});
+});
+document.addEventListener('keyup',e=>{
+  const key=e.key.toUpperCase();
+  if(!keys.includes(key)) return;
+  document.getElementById('key_'+key).classList.remove('pressed');
+});
+
+// Change instrument
+document.getElementById('instrumentSelect').addEventListener('change',e=>{
+  showInstructions(e.target.value);
+});
+</script>
+
+</body>
+</html>
